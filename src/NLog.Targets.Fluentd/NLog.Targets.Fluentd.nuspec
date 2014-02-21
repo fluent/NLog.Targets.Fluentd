@@ -1,0 +1,19 @@
+<?xml version="1.0"?>
+<package >
+  <metadata>
+    <id>NLog.Targets.Fluentd</id>
+    <version>1.0.1</version>
+    <authors>Moriyoshi Koizumi</authors>
+    <owners>Moriyoshi Koizumi</owners>
+    <projectUrl>https://github.com/moriyoshi/NLog.Targets.Fluentd</projectUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <description>Custom target of NLog (https://github.com/nlog/NLog) that emits the log entries to a fluentd (http://www.fluentd.org/) node</description>
+    <releaseNotes>Initial.</releaseNotes>
+    <copyright>Copyright 2014 Moriyoshi Koizumi</copyright>
+    <tags>NLog Fluentd</tags>
+    <dependencies>
+      <dependency id="MsgPack.Cli" version="0.4.1" />
+      <dependency id="NLog" version="2.0.0" />
+    </dependencies>
+  </metadata>
+</package>
