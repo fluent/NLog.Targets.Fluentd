@@ -184,6 +184,8 @@ namespace NLog.Targets
 
         public int LingerTime { get; set; }
 
+        public bool EmitStackTraceWhenAvailable { get; set; }
+
         private TcpClient client;
 
         private Stream stream;
@@ -247,7 +249,7 @@ namespace NLog.Targets
                 { "logger_name", logEvent.LoggerName },
                 { "sequence_id", logEvent.SequenceID },
             };
-            if (logEvent.HasStackTrace)
+            if (EmitStackTraceWhenAvailable && logEvent.HasStackTrace)
             {
                 var transcodedFrames = new List<Dictionary<string, object>>();
                 StackTrace stackTrace = logEvent.StackTrace;
@@ -289,6 +291,7 @@ namespace NLog.Targets
             SendTimeout = 1000;
             LingerEnabled = true;
             LingerTime = 1000;
+            EmitStackTraceWhenAvailable = false;
             Tag = Assembly.GetCallingAssembly().GetName().Name;
             client = new TcpClient();
         }
