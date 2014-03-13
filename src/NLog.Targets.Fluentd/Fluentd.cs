@@ -219,7 +219,7 @@ namespace NLog.Targets
             }
         }
 
-        protected override void Dispose(bool disposing)
+        protected void Cleanup()
         {
             if (this.stream != null)
             {
@@ -231,13 +231,17 @@ namespace NLog.Targets
                 this.client.Close();
                 this.client = null;
             }
+        }
+
+        protected override void Dispose(bool disposing)
+        {
+            Cleanup();
             base.Dispose(disposing);
         }
 
         protected override void CloseTarget()
         {
-            this.stream.Close();
-            this.client.Close();
+            Cleanup();
             base.CloseTarget();
         }
 

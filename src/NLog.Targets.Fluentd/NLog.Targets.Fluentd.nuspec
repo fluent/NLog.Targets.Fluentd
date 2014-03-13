@@ -2,13 +2,13 @@
 <package >
   <metadata>
     <id>NLog.Targets.Fluentd</id>
-    <version>1.0.2</version>
+    <version>1.0.3</version>
     <authors>Moriyoshi Koizumi</authors>
     <owners>Moriyoshi Koizumi</owners>
     <projectUrl>https://github.com/moriyoshi/NLog.Targets.Fluentd</projectUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>Custom target of NLog (https://github.com/nlog/NLog) that emits the log entries to a fluentd (http://www.fluentd.org/) node</description>
-    <releaseNotes>Initial.</releaseNotes>
+    <releaseNotes>Fix NullReferenceError in CloseTarget()</releaseNotes>
     <copyright>Copyright 2014 Moriyoshi Koizumi</copyright>
     <tags>NLog Fluentd</tags>
     <dependencies>
