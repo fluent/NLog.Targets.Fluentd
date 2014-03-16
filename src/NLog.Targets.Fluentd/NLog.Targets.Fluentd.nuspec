@@ -2,7 +2,7 @@
 <package >
   <metadata>
     <id>NLog.Targets.Fluentd</id>
-    <version>1.0.3</version>
+    <version>1.0.4</version>
     <authors>Moriyoshi Koizumi</authors>
     <owners>Moriyoshi Koizumi</owners>
     <projectUrl>https://github.com/moriyoshi/NLog.Targets.Fluentd</projectUrl>
