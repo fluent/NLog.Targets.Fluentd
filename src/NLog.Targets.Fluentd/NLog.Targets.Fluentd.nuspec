@@ -8,7 +8,7 @@
     <projectUrl>https://github.com/moriyoshi/NLog.Targets.Fluentd</projectUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>Custom target of NLog (https://github.com/nlog/NLog) that emits the log entries to a fluentd (http://www.fluentd.org/) node</description>
-    <releaseNotes>Fix NullReferenceError in CloseTarget()</releaseNotes>
+    <releaseNotes>Address the problem that the wrong timestamp may be sent to the fluentd node (timestamp value varies by your timezone setting)</releaseNotes>
     <copyright>Copyright 2014 Moriyoshi Koizumi</copyright>
     <tags>NLog Fluentd</tags>
     <dependencies>
