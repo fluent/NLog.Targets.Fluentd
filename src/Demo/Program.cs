@@ -34,13 +34,15 @@ namespace Demo
         static void Main(string[] args)
         {
             var config = new NLog.Config.LoggingConfiguration();
-            var fluentdTarget = new NLog.Targets.Fluentd();
-            fluentdTarget.Layout = new NLog.Layouts.SimpleLayout("${longdate}|${level}|${callsite}|${logger}|${message}");
-            config.AddTarget("fluentd", fluentdTarget);
-            config.LoggingRules.Add(new NLog.Config.LoggingRule("demo", LogLevel.Debug, fluentdTarget));
-            var loggerFactory = new LogFactory(config);
-            var logger = loggerFactory.GetLogger("demo");
-            logger.Info("Hello World!");
+            using (var fluentdTarget = new NLog.Targets.Fluentd())
+            {
+                fluentdTarget.Layout = new NLog.Layouts.SimpleLayout("${longdate}|${level}|${callsite}|${logger}|${message}");
+                config.AddTarget("fluentd", fluentdTarget);
+                config.LoggingRules.Add(new NLog.Config.LoggingRule("demo", LogLevel.Debug, fluentdTarget));
+                var loggerFactory = new LogFactory(config);
+                var logger = loggerFactory.GetLogger("demo");
+                logger.Info("Hello World!");
+            }
         }
     }
 }
