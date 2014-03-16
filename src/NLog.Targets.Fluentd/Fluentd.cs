@@ -146,7 +146,7 @@ namespace NLog.Targets
 
         public void Emit(DateTime timestamp, string tag, IDictionary<string, object> data)
         {
-            long unixTimestamp = timestamp.Subtract(unixEpoch).Ticks / 10000000;
+            long unixTimestamp = timestamp.ToUniversalTime().Subtract(unixEpoch).Ticks / 10000000;
             packer.PackArrayHeader(3);
             packer.PackString(tag, Encoding.UTF8);
             packer.Pack((ulong)unixTimestamp);
