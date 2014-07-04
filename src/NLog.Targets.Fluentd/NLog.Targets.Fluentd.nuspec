@@ -5,11 +5,11 @@
     <version>1.0.4</version>
     <authors>Moriyoshi Koizumi</authors>
     <owners>Moriyoshi Koizumi</owners>
-    <projectUrl>https://github.com/moriyoshi/NLog.Targets.Fluentd</projectUrl>
+    <projectUrl>https://github.com/fluent/NLog.Targets.Fluentd</projectUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
     <description>Custom target of NLog (https://github.com/nlog/NLog) that emits the log entries to a fluentd (http://www.fluentd.org/) node</description>
     <releaseNotes>Address the problem that the wrong timestamp may be sent to the fluentd node (timestamp value varies by your timezone setting)</releaseNotes>
-    <copyright>Copyright 2014 Moriyoshi Koizumi</copyright>
+    <copyright>Copyright 2014 Moriyoshi Koizumi and contributors</copyright>
     <tags>NLog Fluentd</tags>
     <dependencies>
       <dependency id="MsgPack.Cli" version="0.4.1" />
