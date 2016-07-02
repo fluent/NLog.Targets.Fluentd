@@ -24,11 +24,38 @@ using System.Reflection;
 using NLog;
 using MsgPack;
 using MsgPack.Serialization;
+using Newtonsoft.Json.Linq;
+using System.Linq;
 
 namespace NLog.Targets
 {
+    public static class JsonHelper
+    {
+        public static object Deserialize(string json) 
+        {
+            return ToObject(JToken.Parse(json));
+        }
+
+        private static object ToObject(JToken token)
+        {
+            switch (token.Type)
+            {
+                case JTokenType.Object:
+                    return token.Children<JProperty>()
+                                .ToDictionary(prop => prop.Name,
+                                              prop => ToObject(prop.Value));
+
+                case JTokenType.Array:
+                    return token.Select(ToObject).ToList();
+
+                default:
+                    return ((JValue)token).Value;
+            }
+        }
+    }
     internal class OrdinaryDictionarySerializer: MessagePackSerializer<IDictionary<string, object>>
     {
+        public OrdinaryDictionarySerializer(SerializationContext sc): base(sc) { }
         protected override void PackToCore(Packer packer, IDictionary<string, object> objectTree)
         {
             packer.PackMapHeader(objectTree);
@@ -106,7 +133,7 @@ namespace NLog.Targets
             }
         }
 
-        public void UnpackTo(Unpacker unpacker, IDictionary<string, object> collection)
+        public new void  UnpackTo(Unpacker unpacker, IDictionary<string, object> collection)
         {
             long mapLength;
             if (!unpacker.ReadMapLength(out mapLength))
@@ -150,7 +177,7 @@ namespace NLog.Targets
         public FluentdEmitter(Stream stream)
         {
             this.serializationContext = new SerializationContext(PackerCompatibilityOptions.PackBinaryAsRaw);
-            this.serializationContext.Serializers.Register(new OrdinaryDictionarySerializer());
+            this.serializationContext.Serializers.Register(new OrdinaryDictionarySerializer(this.serializationContext));
             this.packer = Packer.Create(stream);
         }
     }
@@ -179,6 +206,8 @@ namespace NLog.Targets
         public int LingerTime { get; set; }
 
         public bool EmitStackTraceWhenAvailable { get; set; }
+
+        public bool UseJsonParsing { get; set; }
 
         private TcpClient client;
 
@@ -241,12 +270,38 @@ namespace NLog.Targets
 
         protected override void Write(LogEventInfo logEvent)
         {
+            object messageData = null;
+            var messageLayout = Layout.Render(logEvent);
+            if (UseJsonParsing)
+            {
+                try
+                {
+                    messageData = JsonHelper.Deserialize(messageLayout);
+
+                }
+                catch
+                {
+                }
+            }
+            
             var record = new Dictionary<string, object> {
                 { "level", logEvent.Level.Name },
-                { "message", Layout.Render(logEvent) },
+                { "message", messageLayout  },
                 { "logger_name", logEvent.LoggerName },
                 { "sequence_id", logEvent.SequenceID },
             };
+            if (UseJsonParsing && messageData != null)
+            {
+                if ( messageData is IDictionary<string,object>)
+                {
+                    var dict = messageData as IDictionary<string, object>;
+                    foreach(var obj in dict)
+                    {
+                        record.Add(obj.Key, obj.Value);
+                    }
+                }
+            }
+            
             if (EmitStackTraceWhenAvailable && logEvent.HasStackTrace)
             {
                 var transcodedFrames = new List<Dictionary<string, object>>();
@@ -290,7 +345,8 @@ namespace NLog.Targets
             LingerEnabled = true;
             LingerTime = 1000;
             EmitStackTraceWhenAvailable = false;
-            Tag = Assembly.GetCallingAssembly().GetName().Name;
+            UseJsonParsing = true;
+            Tag = "fluentd";
             client = new TcpClient();
         }
     }
