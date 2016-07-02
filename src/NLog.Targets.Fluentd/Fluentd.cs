@@ -346,7 +346,7 @@ namespace NLog.Targets
             LingerTime = 1000;
             EmitStackTraceWhenAvailable = false;
             UseJsonParsing = true;
-            Tag = "fluentd";
+            Tag = Assembly.GetCallingAssembly().GetName().Name;
             client = new TcpClient();
         }
     }
