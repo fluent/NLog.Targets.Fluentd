@@ -29,6 +29,10 @@ namespace NLog.Targets
 {
     internal class OrdinaryDictionarySerializer: MessagePackSerializer<IDictionary<string, object>>
     {
+        internal OrdinaryDictionarySerializer(SerializationContext ownerContext) : base(ownerContext)
+        {
+        }
+
         protected override void PackToCore(Packer packer, IDictionary<string, object> objectTree)
         {
             packer.PackMapHeader(objectTree);
@@ -150,7 +154,7 @@ namespace NLog.Targets
         public FluentdEmitter(Stream stream)
         {
             this.serializationContext = new SerializationContext(PackerCompatibilityOptions.PackBinaryAsRaw);
-            this.serializationContext.Serializers.Register(new OrdinaryDictionarySerializer());
+            this.serializationContext.Serializers.Register(new OrdinaryDictionarySerializer(this.serializationContext));
             this.packer = Packer.Create(stream);
         }
     }
