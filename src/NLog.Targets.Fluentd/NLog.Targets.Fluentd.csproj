@@ -31,7 +31,7 @@
   </PropertyGroup>
   <ItemGroup>
     <Reference Include="MsgPack">
-      <HintPath>..\packages\MsgPack.Cli.0.4.1\lib\net40-client\MsgPack.dll</HintPath>
+      <HintPath>..\packages\MsgPack.Cli.0.8.0\lib\net45\MsgPack.dll</HintPath>
     </Reference>
     <Reference Include="NLog">
       <HintPath>..\packages\NLog.2.1.0\lib\net45\NLog.dll</HintPath>
