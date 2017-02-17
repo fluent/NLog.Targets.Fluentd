@@ -20,6 +20,7 @@ using System.IO;
 using System.Text;
 using System.Net.Sockets;
 using System.Diagnostics;
+using System.Linq;
 using System.Reflection;
 using NLog;
 using MsgPack;
@@ -134,24 +135,24 @@ namespace NLog.Targets
 
     internal class FluentdEmitter
     {
-        private static DateTime unixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-        private Packer packer;
-        private SerializationContext serializationContext;
+        private static readonly DateTime UnixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
+        private readonly Packer _packer;
+        private readonly SerializationContext _serializationContext;
 
         public void Emit(DateTime timestamp, string tag, IDictionary<string, object> data)
         {
-            long unixTimestamp = timestamp.ToUniversalTime().Subtract(unixEpoch).Ticks / 10000000;
-            packer.PackArrayHeader(3);
-            packer.PackString(tag, Encoding.UTF8);
-            packer.Pack((ulong)unixTimestamp);
-            packer.Pack(data, serializationContext);
+            var unixTimestamp = timestamp.ToUniversalTime().Subtract(UnixEpoch).Ticks / 10000000;
+            _packer.PackArrayHeader(3);
+            _packer.PackString(tag, Encoding.UTF8);
+            _packer.Pack((ulong)unixTimestamp);
+            _packer.Pack(data, _serializationContext);
         }
 
         public FluentdEmitter(Stream stream)
         {
-            this.serializationContext = new SerializationContext(PackerCompatibilityOptions.PackBinaryAsRaw);
-            this.serializationContext.Serializers.Register(new OrdinaryDictionarySerializer());
-            this.packer = Packer.Create(stream);
+            this._serializationContext = new SerializationContext(PackerCompatibilityOptions.PackBinaryAsRaw);
+            this._serializationContext.Serializers.Register(new OrdinaryDictionarySerializer());
+            this._packer = Packer.Create(stream);
         }
     }
 
@@ -180,33 +181,31 @@ namespace NLog.Targets
 
         public bool EmitStackTraceWhenAvailable { get; set; }
 
-        private TcpClient client;
+        private TcpClient _client;
 
-        private Stream stream;
+        private Stream _stream;
 
-        private FluentdEmitter emitter;
+        private FluentdEmitter _emitter;
 
         protected override void InitializeTarget()
         {
             base.InitializeTarget();
-            client.NoDelay = this.NoDelay;
-            client.ReceiveBufferSize = this.ReceiveBufferSize;
-            client.SendBufferSize = this.SendBufferSize;
-            client.SendTimeout = this.SendTimeout;
-            client.ReceiveTimeout = this.ReceiveTimeout;
-            client.LingerState = new LingerOption(this.LingerEnabled, this.LingerTime);
+            _client.NoDelay = this.NoDelay;
+            _client.ReceiveBufferSize = this.ReceiveBufferSize;
+            _client.SendBufferSize = this.SendBufferSize;
+            _client.SendTimeout = this.SendTimeout;
+            _client.ReceiveTimeout = this.ReceiveTimeout;
+            _client.LingerState = new LingerOption(this.LingerEnabled, this.LingerTime);
         }
 
         protected void EnsureConnected()
         {
             try
             {
-                if (!client.Connected)
-                {
-                    client.Connect(this.Host, this.Port);
-                    this.stream = this.client.GetStream();
-                    this.emitter = new FluentdEmitter(this.stream);
-                }
+                if (_client.Connected) return;
+                _client.Connect(this.Host, this.Port);
+                this._stream = this._client.GetStream();
+                this._emitter = new FluentdEmitter(this._stream);
             }
             catch (Exception e)
             {
@@ -215,15 +214,15 @@ namespace NLog.Targets
 
         protected void Cleanup()
         {
-            if (this.stream != null)
+            if (this._stream != null)
             {
-                this.stream.Dispose();
-                this.stream = null;
+                this._stream.Dispose();
+                this._stream = null;
             }
-            if (this.client != null)
+            if (this._client != null)
             {
-                this.client.Close();
-                this.client = null;
+                this._client.Close();
+                this._client = null;
             }
         }
 
@@ -249,33 +248,21 @@ namespace NLog.Targets
             };
             if (EmitStackTraceWhenAvailable && logEvent.HasStackTrace)
             {
-                var transcodedFrames = new List<Dictionary<string, object>>();
-                StackTrace stackTrace = logEvent.StackTrace;
-                foreach (StackFrame frame in stackTrace.GetFrames())
+                var stackTrace = logEvent.StackTrace;
+                var transcodedFrames = stackTrace.GetFrames().Select(frame => new Dictionary<string, object>
                 {
-                    var transcodedFrame = new Dictionary<string, object>
-                    {
-                        { "filename", frame.GetFileName() },
-                        { "line", frame.GetFileLineNumber() },
-                        { "column", frame.GetFileColumnNumber() },
-                        { "method", frame.GetMethod().ToString() },
-                        { "il_offset", frame.GetILOffset() },
-                        { "native_offset", frame.GetNativeOffset() },
-                    };
-                    transcodedFrames.Add(transcodedFrame);
-                }
+                    {"filename", frame.GetFileName()}, {"line", frame.GetFileLineNumber()}, {"column", frame.GetFileColumnNumber()}, {"method", frame.GetMethod().ToString()}, {"il_offset", frame.GetILOffset()}, {"native_offset", frame.GetNativeOffset()},
+                }).ToList();
                 record.Add("stacktrace", transcodedFrames);
             }
             EnsureConnected();
-            if (this.emitter != null)
+            if (_emitter == null) return;
+            try
             {
-                try
-                {
-                    this.emitter.Emit(logEvent.TimeStamp, Tag, record);
-                }
-                catch (Exception e)
-                {
-                }
+                this._emitter.Emit(logEvent.TimeStamp, Tag, record);
+            }
+            catch (Exception e)
+            {
             }
         }
 
@@ -291,7 +278,7 @@ namespace NLog.Targets
             LingerTime = 1000;
             EmitStackTraceWhenAvailable = false;
             Tag = Assembly.GetCallingAssembly().GetName().Name;
-            client = new TcpClient();
+            _client = new TcpClient();
         }
     }
 }
