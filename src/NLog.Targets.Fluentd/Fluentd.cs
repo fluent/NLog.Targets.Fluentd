@@ -198,6 +198,7 @@ namespace NLog.Targets
 
         private void InitializeClient()
         {
+            client = new TcpClient();
             client.NoDelay = this.NoDelay;
             client.ReceiveBufferSize = this.ReceiveBufferSize;
             client.SendBufferSize = this.SendBufferSize;
@@ -210,20 +211,28 @@ namespace NLog.Targets
         {
             try
             {
-                if (!client.Connected)
+                if(client == null)
+                {
+                    InitializeClient();
+                    ConnectClient();
+                }
+                else if (!client.Connected)
                 {
                     Cleanup();
-                    client = new TcpClient();
                     InitializeClient();
-
-                    client.Connect(this.Host, this.Port);
-                    this.stream = this.client.GetStream();
-                    this.emitter = new FluentdEmitter(this.stream);
+                    ConnectClient();
                 }
             }
             catch (Exception e)
             {
             }
+        }
+
+        private void ConnectClient()
+        {
+            client.Connect(this.Host, this.Port);
+            this.stream = this.client.GetStream();
+            this.emitter = new FluentdEmitter(this.stream);
         }
 
         protected void Cleanup()
@@ -304,7 +313,6 @@ namespace NLog.Targets
             LingerTime = 1000;
             EmitStackTraceWhenAvailable = false;
             Tag = Assembly.GetCallingAssembly().GetName().Name;
-            client = new TcpClient();
         }
     }
 }
