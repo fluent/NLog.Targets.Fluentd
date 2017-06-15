@@ -24,6 +24,7 @@ using System.Reflection;
 using NLog;
 using MsgPack;
 using MsgPack.Serialization;
+using NLog.Common;
 
 namespace NLog.Targets
 {
@@ -193,6 +194,10 @@ namespace NLog.Targets
         protected override void InitializeTarget()
         {
             base.InitializeTarget();
+        }
+
+        private void InitializeClient()
+        {
             client.NoDelay = this.NoDelay;
             client.ReceiveBufferSize = this.ReceiveBufferSize;
             client.SendBufferSize = this.SendBufferSize;
@@ -207,6 +212,10 @@ namespace NLog.Targets
             {
                 if (!client.Connected)
                 {
+                    Cleanup();
+                    client = new TcpClient();
+                    InitializeClient();
+
                     client.Connect(this.Host, this.Port);
                     this.stream = this.client.GetStream();
                     this.emitter = new FluentdEmitter(this.stream);
