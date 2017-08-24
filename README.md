@@ -1,6 +1,3 @@
-NLog.Targets.Fluentd Fork: fix TCP Client reconnection to fluentd
-====================
-
 NLog.Targets.Fluentd
 ====================
 
