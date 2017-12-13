@@ -28,10 +28,13 @@ using NLog.Common;
 
 namespace NLog.Targets
 {
-    internal class OrdinaryDictionarySerializer: MessagePackSerializer<IDictionary<string, object>>
+    internal class OrdinaryDictionarySerializer : MessagePackSerializer<IDictionary<string, object>>
     {
-        internal OrdinaryDictionarySerializer(SerializationContext ownerContext) : base(ownerContext)
+        readonly SerializationContext _embeddedContext;
+
+        internal OrdinaryDictionarySerializer(SerializationContext ownerContext, SerializationContext embeddedContext) : base(ownerContext)
         {
+            _embeddedContext = embeddedContext ?? ownerContext;
         }
 
         protected override void PackToCore(Packer packer, IDictionary<string, object> objectTree)
@@ -40,9 +43,14 @@ namespace NLog.Targets
             foreach (KeyValuePair<string, object> pair in objectTree)
             {
                 packer.PackString(pair.Key);
-                var serializationContext = new SerializationContext(packer.CompatibilityOptions);
-                serializationContext.Serializers.Register(this);
-                packer.Pack(pair.Value, serializationContext);
+                if (pair.Value == null)
+                {
+                    packer.PackNull();
+                }
+                else
+                {
+                    packer.Pack(pair.Value, _embeddedContext);
+                }
             }
         }
 
@@ -60,7 +68,11 @@ namespace NLog.Targets
                 {
                     throw new InvalidMessagePackStreamException("unexpected EOF");
                 }
-                if (unpacker.IsMapHeader)
+                if (unpacker.LastReadData.IsNil)
+                {
+                    dict.Add(key, null);
+                }
+                else if (unpacker.IsMapHeader)
                 {
                     long innerMapLength = value.AsInt64();
                     var innerDict = new Dictionary<string, object>();
@@ -123,6 +135,11 @@ namespace NLog.Targets
 
         protected override IDictionary<string, object> UnpackFromCore(Unpacker unpacker)
         {
+            if (!unpacker.IsMapHeader)
+            {
+                throw new InvalidMessagePackStreamException("map header expected");
+            }
+
             var retval = new Dictionary<string, object>();
             UnpackTo(unpacker, retval);
             return retval;
@@ -140,23 +157,28 @@ namespace NLog.Targets
     internal class FluentdEmitter
     {
         private static DateTime unixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-        private Packer packer;
-        private SerializationContext serializationContext;
+        private readonly Packer _packer;
+        private readonly SerializationContext _serializationContext;
+        private readonly Stream _destination;
 
         public void Emit(DateTime timestamp, string tag, IDictionary<string, object> data)
         {
             long unixTimestamp = timestamp.ToUniversalTime().Subtract(unixEpoch).Ticks / 10000000;
-            packer.PackArrayHeader(3);
-            packer.PackString(tag, Encoding.UTF8);
-            packer.Pack((ulong)unixTimestamp);
-            packer.Pack(data, serializationContext);
+            _packer.PackArrayHeader(3);
+            _packer.PackString(tag, Encoding.UTF8);
+            _packer.Pack((ulong)unixTimestamp);
+            _packer.Pack(data, _serializationContext);
+            _destination.Flush();    // Change to packer.Flush() when packer is upgraded
         }
 
         public FluentdEmitter(Stream stream)
         {
-            this.serializationContext = new SerializationContext(PackerCompatibilityOptions.PackBinaryAsRaw);
-            this.serializationContext.Serializers.Register(new OrdinaryDictionarySerializer(this.serializationContext));
-            this.packer = Packer.Create(stream);
+            _destination = stream;
+            _packer = Packer.Create(_destination);
+            var embeddedContext  = new SerializationContext(_packer.CompatibilityOptions);
+            embeddedContext.Serializers.Register(new OrdinaryDictionarySerializer(embeddedContext, null));
+            _serializationContext = new SerializationContext(PackerCompatibilityOptions.PackBinaryAsRaw);
+            _serializationContext.Serializers.Register(new OrdinaryDictionarySerializer(_serializationContext, embeddedContext));
         }
     }
 
@@ -187,11 +209,11 @@ namespace NLog.Targets
 
         public bool IncludeAllProperties { get; set; }
 
-        private TcpClient client;
+        private TcpClient _client;
 
-        private Stream stream;
+        private Stream _stream;
 
-        private FluentdEmitter emitter;
+        private FluentdEmitter _emitter;
 
         protected override void InitializeTarget()
         {
@@ -200,56 +222,54 @@ namespace NLog.Targets
 
         private void InitializeClient()
         {
-            client = new TcpClient();
-            client.NoDelay = this.NoDelay;
-            client.ReceiveBufferSize = this.ReceiveBufferSize;
-            client.SendBufferSize = this.SendBufferSize;
-            client.SendTimeout = this.SendTimeout;
-            client.ReceiveTimeout = this.ReceiveTimeout;
-            client.LingerState = new LingerOption(this.LingerEnabled, this.LingerTime);
+            _client = new TcpClient();
+            _client.NoDelay = NoDelay;
+            _client.ReceiveBufferSize = ReceiveBufferSize;
+            _client.SendBufferSize = SendBufferSize;
+            _client.SendTimeout = SendTimeout;
+            _client.ReceiveTimeout = ReceiveTimeout;
+            _client.LingerState = new LingerOption(LingerEnabled, LingerTime);
         }
 
         protected void EnsureConnected()
         {
-            try
+            if (_client == null)
             {
-                if(client == null)
-                {
-                    InitializeClient();
-                    ConnectClient();
-                }
-                else if (!client.Connected)
-                {
-                    Cleanup();
-                    InitializeClient();
-                    ConnectClient();
-                }
+                InitializeClient();
+                ConnectClient();
             }
-            catch (Exception e)
+            else if (!_client.Connected)
             {
+                Cleanup();
+                InitializeClient();
+                ConnectClient();
             }
         }
 
         private void ConnectClient()
         {
-            client.Connect(this.Host, this.Port);
-            this.stream = this.client.GetStream();
-            this.emitter = new FluentdEmitter(this.stream);
+            _client.Connect(Host, Port);
+            _stream = _client.GetStream();
+            _emitter = new FluentdEmitter(_stream);
         }
 
         protected void Cleanup()
         {
-            if (this.stream != null)
+            try
             {
-                this.stream.Dispose();
-                this.stream = null;
+                _stream?.Dispose();
+                _client?.Close();
             }
-            if (this.client != null)
+            catch (Exception ex)
             {
-                this.client.Close();
-                this.client = null;
+                NLog.Common.InternalLogger.Warn("Fluentd Close - " + ex.ToString());
             }
-            this.emitter = null;
+            finally
+            {
+                _stream = null;
+                _client = null;
+                _emitter = null;
+            }
         }
 
         protected override void Dispose(bool disposing)
@@ -302,16 +322,25 @@ namespace NLog.Targets
                     record[propertyKey] = property.Value;
                 }
             }
-            EnsureConnected();
-            if (this.emitter != null)
+
+            try
             {
-                try
-                {
-                    this.emitter.Emit(logEvent.TimeStamp, Tag, record);
-                }
-                catch (Exception e)
-                {
-                }
+                EnsureConnected();
+            }
+            catch (Exception ex)
+            {
+                NLog.Common.InternalLogger.Warn("Fluentd Connect - " + ex.ToString());
+                throw;  // Notify NLog of failure
+            }
+
+            try
+            {
+                _emitter?.Emit(logEvent.TimeStamp, Tag, record);
+            }
+            catch (Exception ex)
+            {
+                NLog.Common.InternalLogger.Warn("Fluentd Emit - " + ex.ToString());
+                throw;  // Notify NLog of failure
             }
         }
 
