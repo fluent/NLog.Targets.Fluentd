@@ -185,6 +185,8 @@ namespace NLog.Targets
 
         public bool EmitStackTraceWhenAvailable { get; set; }
 
+        public bool IncludeAllProperties { get; set; }
+
         private TcpClient client;
 
         private Stream stream;
@@ -247,6 +249,7 @@ namespace NLog.Targets
                 this.client.Close();
                 this.client = null;
             }
+            this.emitter = null;
         }
 
         protected override void Dispose(bool disposing)
@@ -287,6 +290,17 @@ namespace NLog.Targets
                     transcodedFrames.Add(transcodedFrame);
                 }
                 record.Add("stacktrace", transcodedFrames);
+            }
+            if (IncludeAllProperties && logEvent.Properties.Count > 0)
+            {
+                foreach (var property in logEvent.Properties)
+                {
+                    var propertyKey = property.Key.ToString();
+                    if (string.IsNullOrEmpty(propertyKey))
+                        continue;
+
+                    record[propertyKey] = property.Value;
+                }
             }
             EnsureConnected();
             if (this.emitter != null)
