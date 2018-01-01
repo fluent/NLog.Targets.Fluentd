@@ -21,20 +21,18 @@ using System.Text;
 using System.Net.Sockets;
 using System.Diagnostics;
 using System.Reflection;
-using NLog;
 using MsgPack;
 using MsgPack.Serialization;
-using NLog.Common;
 
 namespace NLog.Targets
 {
     internal class OrdinaryDictionarySerializer : MessagePackSerializer<IDictionary<string, object>>
     {
-        readonly SerializationContext _embeddedContext;
+        private readonly SerializationContext embeddedContext;
 
         internal OrdinaryDictionarySerializer(SerializationContext ownerContext, SerializationContext embeddedContext) : base(ownerContext)
         {
-            _embeddedContext = embeddedContext ?? ownerContext;
+            this.embeddedContext = embeddedContext ?? ownerContext;
         }
 
         protected override void PackToCore(Packer packer, IDictionary<string, object> objectTree)
@@ -49,7 +47,7 @@ namespace NLog.Targets
                 }
                 else
                 {
-                    packer.Pack(pair.Value, _embeddedContext);
+                    packer.Pack(pair.Value, this.embeddedContext);
                 }
             }
         }
@@ -147,38 +145,38 @@ namespace NLog.Targets
 
         public void UnpackTo(Unpacker unpacker, object collection)
         {
-            var _collection = collection as IDictionary<string, object>;
-            if (_collection == null)
+            var dictionary = collection as IDictionary<string, object>;
+            if (dictionary == null)
                 throw new NotSupportedException();
-            UnpackTo(unpacker, _collection);
+            UnpackTo(unpacker, dictionary);
         }
     }
 
     internal class FluentdEmitter
     {
         private static DateTime unixEpoch = new DateTime(1970, 1, 1, 0, 0, 0, DateTimeKind.Utc);
-        private readonly Packer _packer;
-        private readonly SerializationContext _serializationContext;
-        private readonly Stream _destination;
+        private readonly Packer packer;
+        private readonly SerializationContext serializationContext;
+        private readonly Stream destination;
 
         public void Emit(DateTime timestamp, string tag, IDictionary<string, object> data)
         {
             long unixTimestamp = timestamp.ToUniversalTime().Subtract(unixEpoch).Ticks / 10000000;
-            _packer.PackArrayHeader(3);
-            _packer.PackString(tag, Encoding.UTF8);
-            _packer.Pack((ulong)unixTimestamp);
-            _packer.Pack(data, _serializationContext);
-            _destination.Flush();    // Change to packer.Flush() when packer is upgraded
+            this.packer.PackArrayHeader(3);
+            this.packer.PackString(tag, Encoding.UTF8);
+            this.packer.Pack((ulong)unixTimestamp);
+            this.packer.Pack(data, serializationContext);
+            this.destination.Flush();    // Change to packer.Flush() when packer is upgraded
         }
 
         public FluentdEmitter(Stream stream)
         {
-            _destination = stream;
-            _packer = Packer.Create(_destination);
-            var embeddedContext  = new SerializationContext(_packer.CompatibilityOptions);
+            this.destination = stream;
+            this.packer = Packer.Create(destination);
+            var embeddedContext  = new SerializationContext(this.packer.CompatibilityOptions);
             embeddedContext.Serializers.Register(new OrdinaryDictionarySerializer(embeddedContext, null));
-            _serializationContext = new SerializationContext(PackerCompatibilityOptions.PackBinaryAsRaw);
-            _serializationContext.Serializers.Register(new OrdinaryDictionarySerializer(_serializationContext, embeddedContext));
+            this.serializationContext = new SerializationContext(PackerCompatibilityOptions.PackBinaryAsRaw);
+            this.serializationContext.Serializers.Register(new OrdinaryDictionarySerializer(this.serializationContext, embeddedContext));
         }
     }
 
@@ -209,11 +207,11 @@ namespace NLog.Targets
 
         public bool IncludeAllProperties { get; set; }
 
-        private TcpClient _client;
+        private TcpClient client;
 
-        private Stream _stream;
+        private Stream stream;
 
-        private FluentdEmitter _emitter;
+        private FluentdEmitter emitter;
 
         protected override void InitializeTarget()
         {
@@ -222,23 +220,23 @@ namespace NLog.Targets
 
         private void InitializeClient()
         {
-            _client = new TcpClient();
-            _client.NoDelay = NoDelay;
-            _client.ReceiveBufferSize = ReceiveBufferSize;
-            _client.SendBufferSize = SendBufferSize;
-            _client.SendTimeout = SendTimeout;
-            _client.ReceiveTimeout = ReceiveTimeout;
-            _client.LingerState = new LingerOption(LingerEnabled, LingerTime);
+            this.client = new TcpClient();
+            this.client.NoDelay = this.NoDelay;
+            this.client.ReceiveBufferSize = this.ReceiveBufferSize;
+            this.client.SendBufferSize = this.SendBufferSize;
+            this.client.SendTimeout = this.SendTimeout;
+            this.client.ReceiveTimeout = this.ReceiveTimeout;
+            this.client.LingerState = new LingerOption(this.LingerEnabled, this.LingerTime);
         }
 
         protected void EnsureConnected()
         {
-            if (_client == null)
+            if (this.client == null)
             {
                 InitializeClient();
                 ConnectClient();
             }
-            else if (!_client.Connected)
+            else if (!this.client.Connected)
             {
                 Cleanup();
                 InitializeClient();
@@ -248,17 +246,17 @@ namespace NLog.Targets
 
         private void ConnectClient()
         {
-            _client.Connect(Host, Port);
-            _stream = _client.GetStream();
-            _emitter = new FluentdEmitter(_stream);
+            this.client.Connect(this.Host, this.Port);
+            this.stream = this.client.GetStream();
+            this.emitter = new FluentdEmitter(this.stream);
         }
 
         protected void Cleanup()
         {
             try
             {
-                _stream?.Dispose();
-                _client?.Close();
+                this.stream?.Dispose();
+                this.client?.Close();
             }
             catch (Exception ex)
             {
@@ -266,9 +264,9 @@ namespace NLog.Targets
             }
             finally
             {
-                _stream = null;
-                _client = null;
-                _emitter = null;
+                this.stream = null;
+                this.client = null;
+                this.emitter = null;
             }
         }
 
@@ -292,7 +290,7 @@ namespace NLog.Targets
                 { "logger_name", logEvent.LoggerName },
                 { "sequence_id", logEvent.SequenceID },
             };
-            if (EmitStackTraceWhenAvailable && logEvent.HasStackTrace)
+            if (this.EmitStackTraceWhenAvailable && logEvent.HasStackTrace)
             {
                 var transcodedFrames = new List<Dictionary<string, object>>();
                 StackTrace stackTrace = logEvent.StackTrace;
@@ -311,7 +309,7 @@ namespace NLog.Targets
                 }
                 record.Add("stacktrace", transcodedFrames);
             }
-            if (IncludeAllProperties && logEvent.Properties.Count > 0)
+            if (this.IncludeAllProperties && logEvent.Properties.Count > 0)
             {
                 foreach (var property in logEvent.Properties)
                 {
@@ -319,7 +317,7 @@ namespace NLog.Targets
                     if (string.IsNullOrEmpty(propertyKey))
                         continue;
 
-                    record[propertyKey] = property.Value;
+                    record[propertyKey] = SerializePropertyValue(propertyKey, property.Value);
                 }
             }
 
@@ -335,7 +333,7 @@ namespace NLog.Targets
 
             try
             {
-                _emitter?.Emit(logEvent.TimeStamp, Tag, record);
+                this.emitter?.Emit(logEvent.TimeStamp, this.Tag, record);
             }
             catch (Exception ex)
             {
@@ -344,18 +342,30 @@ namespace NLog.Targets
             }
         }
 
+        private static object SerializePropertyValue(string propertyKey, object propertyValue)
+        {
+            if (propertyValue == null || Convert.GetTypeCode(propertyValue) != TypeCode.Object || propertyValue is decimal)
+            {
+                return propertyValue;   // immutable
+            }
+            else
+            {
+                return propertyValue.ToString();
+            }
+        }
+
         public Fluentd()
         {
-            Host = "127.0.0.1";
-            Port = 24224;
-            ReceiveBufferSize = 8192;
-            SendBufferSize = 8192;
-            ReceiveTimeout = 1000;
-            SendTimeout = 1000;
-            LingerEnabled = true;
-            LingerTime = 1000;
-            EmitStackTraceWhenAvailable = false;
-            Tag = Assembly.GetCallingAssembly().GetName().Name;
+            this.Host = "127.0.0.1";
+            this.Port = 24224;
+            this.ReceiveBufferSize = 8192;
+            this.SendBufferSize = 8192;
+            this.ReceiveTimeout = 1000;
+            this.SendTimeout = 1000;
+            this.LingerEnabled = true;
+            this.LingerTime = 1000;
+            this.EmitStackTraceWhenAvailable = false;
+            this.Tag = Assembly.GetCallingAssembly().GetName().Name;
         }
     }
 }
