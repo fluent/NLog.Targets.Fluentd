@@ -17,6 +17,7 @@ SendTimeout                 | Send timeout                                      
 LingerEnabled               | Wait for all the data to be sent when closing the connection | false
 LingerTime                  | Linger timeout                                               | 2
 EmitStackTraceWhenAvailable | Emit a stacktrace for every log entry when available         | false
+IncludeAllProperties        | Include structured logging parameters for every log entry    | false
 
 
 License
