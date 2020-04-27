@@ -15,7 +15,7 @@ NoDelay                     | Enable Nagle's algorithm                          
 SendBufferSize              | Send buffer size                                             | 8192
 SendTimeout                 | Send timeout                                                 | 2
 LingerEnabled               | Wait for all the data to be sent when closing the connection | false
-LingerTime                  | Linger timeout                                               | 2
+LingerTime                  | Linger timeout in seconds (default: 1000)                    | 2
 EmitStackTraceWhenAvailable | Emit a stacktrace for every log entry when available         | false
 IncludeAllProperties        | Include structured logging parameters for every log entry    | false
 
