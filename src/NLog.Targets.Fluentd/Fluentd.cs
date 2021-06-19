@@ -246,6 +246,7 @@ namespace NLog.Targets
 
         private void ConnectClient()
         {
+            NLog.Common.InternalLogger.Debug("Fluentd Connecting to {0}:{1}", this.Host, this.Port);
             this.client.Connect(this.Host, this.Port);
             this.stream = this.client.GetStream();
             this.emitter = new FluentdEmitter(this.stream);
@@ -309,7 +310,7 @@ namespace NLog.Targets
                 }
                 record.Add("stacktrace", transcodedFrames);
             }
-            if (this.IncludeAllProperties && logEvent.Properties.Count > 0)
+            if (this.IncludeAllProperties && logEvent.HasProperties)
             {
                 foreach (var property in logEvent.Properties)
                 {
@@ -344,7 +345,7 @@ namespace NLog.Targets
 
         private static object SerializePropertyValue(string propertyKey, object propertyValue)
         {
-            if (propertyValue == null || Convert.GetTypeCode(propertyValue) != TypeCode.Object || propertyValue is decimal)
+            if (propertyValue == null || Convert.GetTypeCode(propertyValue) != TypeCode.Object)
             {
                 return propertyValue;   // immutable
             }
